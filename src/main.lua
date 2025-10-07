@@ -12,7 +12,7 @@ local function Draw()
     local plocal = entities.GetLocalPlayer()
     if plocal == nil then return end
 
-    radar.DrawBackground()
+    radar.DrawBackground(plocal)
 
     if config.healthbar then
         radar.DrawHealthbar(plocal)
@@ -25,6 +25,10 @@ end
 local function Unload()
     icons.cleanup()
     radar.cleanup()
+
+    config = nil
+    radar = nil
+    icons = nil
 end
 
 callbacks.Register("Draw", Draw)
