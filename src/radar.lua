@@ -43,6 +43,38 @@ local function clamp(v, min, max)
     return math.max(min, math.min(v, max))
 end
 
+local function DrawHealthbar(ent, healthx, healthy, color)
+    local height = 3
+    local size = config.icon_size * 2.0
+
+    --- draw background
+    draw.Color(color.health_bg[1], color.health_bg[2], color.health_bg[3], 255)
+    draw.FilledRect(healthx, healthy, healthx + size, healthy + height)
+
+    local health = ent.health
+    local maxhealth = ent.maxhealth
+    local percent = clamp(health / maxhealth, 0, 1)
+
+    --- drw normal health
+    local r, g
+    r = (1 - percent) * 255
+    g = percent * 255
+
+    draw.Color(r // 1, g // 1, 0, 255)
+    draw.FilledRect(healthx, healthy, healthx + (size * percent) // 1, healthy + height)
+
+    if health > maxhealth then
+        health = health - maxhealth
+        maxhealth = ent.maxbuffhealth - maxhealth
+        percent = clamp(health / maxhealth, 0, 1)
+
+        local startX = healthx
+        local endX = startX + (size * percent) // 1
+        draw.Color(color.blu_team[1], color.blu_team[2], color.blu_team[3], 255)
+        draw.FilledRect(startX, healthy, endX, healthy + height)
+    end
+end
+
 function window.DrawBackground(plocal)
     local size = config.size
     local circular = config.circular
@@ -83,8 +115,10 @@ function window.DrawBackground(plocal)
         local w, h = 100, 25
         local gap = 3
         for name, option in pairs(config) do
+            local label = name:gsub("_", " ")
+
             if type(option) == "boolean" then
-                ui.Toggle(plocal, x + size + 3, starty, w, h, name, function()
+                ui.Toggle(plocal, x + size + 3, starty, w, h, label, function()
                     config[name] = not config[name]
                 end)
                 starty = starty + h + gap
@@ -110,6 +144,10 @@ function window.DrawBackground(plocal)
         draw.Color(color.bg[1], color.bg[2], color.bg[3], 250)
         DrawFilledCircle(white_texture, centerX, centerY, halfSize, 64)
     end
+
+    draw.Color(team_color[1], team_color[2], team_color[3], 200)
+    draw.Line(x + size // 2, y + 10, x + size // 2, y + size - 10)
+    draw.Line(x + 10, y + size // 2, x + size - 10, y + size // 2)
 end
 
 function window.DrawPlayers(plocal, players)
@@ -119,6 +157,7 @@ function window.DrawPlayers(plocal, players)
     local icon_size = config.icon_size
     local icon_outline = config.icon_outline
     local light_mode = config.light_mode
+    local healthbar = config.healthbar
 
     local viewAngles = engine.GetViewAngles()
     local yaw = math.rad(viewAngles.y - 90)
@@ -128,15 +167,14 @@ function window.DrawPlayers(plocal, players)
     local color = light_mode and colors.light or colors.dark
     local team_color = plocal:GetTeamNumber() == 2 and color.red_team or color.blu_team
 
-    for _, player in pairs(players) do
-        if player:IsDormant() or player:IsAlive() == false then goto skip end
-        if player:GetIndex() == plocalIndex and plocal:GetPropBool("m_nForceTauntCam") == false then goto skip end
+    for _, player in ipairs(players) do
+        if player.index == plocalIndex and plocal:GetPropBool("m_nForceTauntCam") == false then goto skip end
 
-        local class = player:GetPropInt("m_iClass")
+        local class = player.class
         local icon = icons.list[class]
         if icon == nil then goto skip end
 
-        local origin = player:GetAbsOrigin()
+        local origin = player.origin
 
         --- get relative position to local player
         local dx = origin.x - plocalPos.x
@@ -175,15 +213,15 @@ function window.DrawPlayers(plocal, players)
             iconY = clamp((y + size / 2 - ry * zoom) // 1, y, y + size) -- invert y to match screen coordinates
         end
 
-        --draw.Color(team_color[1], team_color[2], team_color[3], 255)
-        if player:GetTeamNumber() == 2 then
-            draw.Color(color.red_team[1], color.red_team[2], color.red_team[3], 255)
-        else
-            draw.Color(color.blu_team[1], color.blu_team[2], color.blu_team[3], 255)
-        end
-        local invis = player:InCond(E_TFCOND.TFCond_Cloaked)
+        local invis = player.invis
 
         if icon_outline then
+            if player.team == 2 then
+                draw.Color(color.red_team[1], color.red_team[2], color.red_team[3], 255)
+            else
+                draw.Color(color.blu_team[1], color.blu_team[2], color.blu_team[3], 255)
+            end
+
             local thickness = icon_size + 2
             DrawFilledCircle(white_texture, iconX, iconY, thickness, 32)
 
@@ -209,79 +247,11 @@ function window.DrawPlayers(plocal, players)
             draw.FilledRect(iconX - icon_size, iconY + icon_size + 1, iconX + icon_size, iconY + icon_size + 3)
         end
 
+        if healthbar then
+            DrawHealthbar(player, iconX - icon_size, iconY + icon_size + 5, color)
+        end
+
         ::skip::
-    end
-
-    draw.Color(team_color[1], team_color[2], team_color[3], 255)
-    draw.Line(x + size // 2, y, x + size // 2, y + size)
-    draw.Line(x, y + size // 2, x + size, y + size // 2)
-end
-
-function window.DrawHealthbar(plocal)
-    local size = config.size
-    local circular = config.circular
-    local color = config.light_mode and colors.light or colors.dark
-    local team_color = plocal:GetTeamNumber() == 2 and color.red_team or color.blu_team
-
-    local healthBarX, healthBarY, healthBarW, healthBarH
-    if circular then
-        healthBarX = x
-        healthBarY = y + size + 5
-        healthBarW = size
-        healthBarH = 10
-
-        --- draw background
-        draw.Color(40, 40, 40, 255)
-        draw.FilledRect(healthBarX, healthBarY, healthBarX + healthBarW, healthBarY + healthBarH)
-
-        local health = plocal:GetHealth()
-        local maxhealth = plocal:GetMaxHealth()
-        local percent = clamp(health / maxhealth, 0, 1)
-
-        --- drw normal health
-        draw.Color(216, 222, 233, 255)
-        draw.FilledRect(healthBarX, healthBarY, healthBarX + (healthBarW * percent) // 1, healthBarY + healthBarH)
-
-        if health > maxhealth then
-            health = health - maxhealth
-            maxhealth = plocal:GetMaxBuffedHealth() - maxhealth
-            percent = clamp(health / maxhealth, 0, 1)
-
-            local startX = healthBarX
-            local endX = startX + (healthBarW * percent) // 1
-            draw.Color(team_color[1], team_color[2], team_color[3], 255)
-            draw.FilledRect(startX, healthBarY, endX, healthBarY + healthBarH)
-        end
-
-        draw.Color(team_color[1], team_color[2], team_color[3], 255)
-        draw.OutlinedRect(healthBarX - 1, healthBarY - 1, healthBarX + healthBarW + 1, healthBarY + healthBarH + 1)
-    else
-        healthBarX = x - 15
-        healthBarY = y
-        healthBarW, healthBarH = 10, size
-        draw.Color(90, 90, 90, 255)
-        draw.FilledRect(healthBarX - 1, healthBarY - 1, healthBarX + healthBarW + 1, healthBarY + healthBarH + 1)
-
-        draw.Color(40, 40, 40, 255)
-        draw.FilledRect(healthBarX, healthBarY, healthBarX + healthBarW, healthBarY + healthBarH)
-
-        local health = plocal:GetHealth()
-        local maxhealth = plocal:GetMaxHealth()
-        local percent = clamp(health / maxhealth, 0, 1)
-
-        draw.Color(216, 222, 233, 255)
-        draw.FilledRect(healthBarX, healthBarY + (healthBarH * (1 - percent)) // 1, healthBarX + healthBarW,
-            healthBarY + healthBarH)
-
-        if health > maxhealth then
-            health = health - maxhealth
-            maxhealth = plocal:GetMaxBuffedHealth() - maxhealth
-            percent = clamp(health / maxhealth, 0, 1)
-
-            draw.Color(team_color[1], team_color[2], team_color[3], 255)
-            draw.FilledRect(healthBarX, healthBarY + (healthBarH * (1 - percent)) // 1, healthBarX + healthBarW,
-                healthBarY + healthBarH)
-        end
     end
 end
 

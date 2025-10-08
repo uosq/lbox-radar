@@ -14,12 +14,37 @@ local function Draw()
 
     radar.DrawBackground(plocal)
 
-    if config.healthbar then
-        radar.DrawHealthbar(plocal)
+    local players = entities.FindByClass("CTFPlayer")
+    local list = {}
+
+    local plocalPos = plocal:GetAbsOrigin()
+
+    for _, player in pairs(players) do
+        if player:IsAlive() == false or player:IsDormant() then
+            goto continue
+        end
+
+        local origin = player:GetAbsOrigin()
+        list[#list + 1] = {
+            origin = origin,
+            class = player:GetPropInt("m_iClass"),
+            dist = (origin - plocalPos):LengthSqr(),
+            index = player:GetIndex(),
+            invis = player:InCond(E_TFCOND.TFCond_Cloaked),
+            maxhealth = player:GetMaxHealth(),
+            maxbuffhealth = player:GetMaxBuffedHealth(),
+            health = player:GetHealth(),
+            team = player:GetTeamNumber()
+        }
+
+        ::continue::
     end
 
-    local players = entities.FindByClass("CTFPlayer")
-    radar.DrawPlayers(plocal, players)
+    table.sort(list, function(a, b)
+        return a.dist > b.dist
+    end)
+
+    radar.DrawPlayers(plocal, list)
 end
 
 local function Unload()
