@@ -37,7 +37,7 @@ jobs:
         run: mkdir "${GITHUB_WORKSPACE}/build"
 
       - name: Build Script
-        run: luabundler bundle "${GITHUB_WORKSPACE}src/main.lua" -p "?.lua" -o "${GITHUB_WORKSPACE}/build/radar.lua"
+        run: luabundler bundle "${GITHUB_WORKSPACE}/src/main.lua" -p "?.lua" -o "${GITHUB_WORKSPACE}/build/radar.lua"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
