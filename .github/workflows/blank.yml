@@ -34,10 +34,10 @@ jobs:
         run: npm install -g luabundler
 
       - name: Make build folder
-        run: mkdir "$GITHUB_WORKSPACE/build"
+        run: mkdir "${GITHUB_WORKSPACE}/build"
 
       - name: Build Script
-        run: ./merge.sh
+        run: luabundler bundle "${GITHUB_WORKSPACE}src/main.lua" -p "?.lua" -o "${GITHUB_WORKSPACE}/build/radar.lua"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
